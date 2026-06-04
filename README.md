@@ -24,13 +24,29 @@ Screenshots will be added after running GestureOS on a machine with webcam acces
 
 | Dependency | Recommended Version | Purpose |
 | --- | --- | --- |
-| Python | 3.11+ | Runtime language for the application |
-| OpenCV | `opencv-python>=4.9.0` | Webcam capture, frame display, drawing text overlays |
-| MediaPipe | `mediapipe>=0.10.14` | Hand landmark detection and landmark visualization |
+| Python | 3.14.3 | Runtime used by the current project environment |
+| OpenCV | `opencv-python>=4.13.0` | Webcam capture, frame display, drawing text overlays |
+| MediaPipe | `mediapipe==0.10.35` | Tasks-based hand landmark detection and landmark visualization |
 | PyAutoGUI | `pyautogui>=0.9.54` | Mouse movement, clicking, and scrolling |
-| NumPy | `numpy>=1.26.0` | Numeric distance calculations and frame-compatible data handling |
+| NumPy | `numpy>=2.4.0` | Numeric distance calculations and frame-compatible data handling |
 
 No GUI toolkit, web framework, or unnecessary dependency is included. The only user interface is the OpenCV webcam window.
+
+## Compatibility Notes
+
+GestureOS currently targets Python 3.14.3 with MediaPipe 0.10.35. This MediaPipe build does not expose the legacy `mp.solutions` namespace, so the tracker uses the supported MediaPipe Tasks Vision API:
+
+```text
+mediapipe.tasks.python.vision.HandLandmarker
+```
+
+The Tasks API requires a model asset. Place the official `hand_landmarker.task` file at:
+
+```text
+assets/models/hand_landmarker.task
+```
+
+If the model file is missing, GestureOS raises a clear startup error before opening the webcam.
 
 ## Installation
 
@@ -47,7 +63,19 @@ No GUI toolkit, web framework, or unnecessary dependency is included. The only u
    pip install -r requirements.txt
    ```
 
-3. Confirm that your webcam is connected and available to desktop applications.
+3. Add the MediaPipe hand landmarker model:
+
+   ```text
+   assets/models/hand_landmarker.task
+   ```
+
+   Official model URL:
+
+   ```text
+   https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+   ```
+
+4. Confirm that your webcam is connected and available to desktop applications.
 
 ## How To Run
 
@@ -95,6 +123,7 @@ GestureOS/
 GestureOS separates camera, gesture, control, and rendering concerns:
 
 - `HandTracker` owns webcam access, MediaPipe initialization, landmark extraction, coordinate conversion, and landmark drawing.
+- MediaPipe integration uses the Tasks `HandLandmarker` in `VIDEO` mode instead of the unsupported legacy `mp.solutions.hands.Hands` API.
 - `GestureDetector` owns gesture recognition, normalized finger-distance calculations, gesture classification, and exit-hold state.
 - `MouseController` owns cursor mapping, smoothing, PyAutoGUI actions, click cooldowns, scroll cooldowns, and held-pinch protection.
 - `GestureOSApplication` in `main.py` owns the main loop, module coordination, overlay rendering, lifecycle, and shutdown.
@@ -144,6 +173,8 @@ These features are documented for future phases and are not implemented in the M
 - Scroll direction feels inverted: switch the sign handling in `MouseController._scroll()`.
 - PyAutoGUI failsafe triggers: avoid moving the cursor to the top-left screen corner, or adjust PyAutoGUI behavior in `MouseController` after reviewing safety implications.
 - MediaPipe install issues: use Python 3.11 and upgrade `pip` before installing dependencies.
+- `module 'mediapipe' has no attribute 'solutions'`: install/use MediaPipe 0.10.35 with the current Tasks-based tracker; do not use legacy `mp.solutions` code in this environment.
+- Missing model file: download `hand_landmarker.task` and place it in `assets/models/`.
 
 ## License
 

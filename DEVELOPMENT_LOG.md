@@ -89,3 +89,65 @@
 - Add optional configuration loading while preserving constants as defaults.
 - Add volume, brightness, screenshot, media, presentation, and gaming controllers in later phases.
 - Add analytics, user profiles, and AI-based gesture recognition in later phases.
+
+## 2026-06-04 - MediaPipe 0.10.35 Compatibility Refactor
+
+### Compatibility Audit
+
+- Verified the local environment reports MediaPipe `0.10.35`.
+- Verified top-level `mediapipe` exposes `tasks`, `Image`, and `ImageFormat`.
+- Verified top-level `mediapipe` does not expose `solutions`.
+- Verified the supported hand API is `mediapipe.tasks.python.vision.HandLandmarker`.
+- Verified MediaPipe Tasks supports `IMAGE`, `VIDEO`, and `LIVE_STREAM` running modes.
+
+### Root Cause
+
+The previous tracker used the legacy API:
+
+```python
+import mediapipe as mp
+mp.solutions.hands.Hands(...)
+```
+
+MediaPipe `0.10.35` in the current Python 3.14.3 environment is packaged around the Tasks API and does not provide `mp.solutions`. This caused startup to fail before webcam processing began.
+
+### Chosen Solution
+
+- Refactored `trackers/hand_tracker.py` to use `vision.HandLandmarker`.
+- Configured the landmarker with `vision.RunningMode.VIDEO`.
+- Converted OpenCV BGR frames to contiguous SRGB `mediapipe.Image` objects.
+- Preserved the existing `LandmarkMap` output so gesture and mouse modules remain unchanged.
+- Reused the Tasks drawing utilities and hand connection definitions for landmark rendering.
+- Added `HAND_LANDMARKER_MODEL_PATH` and `MIN_HAND_PRESENCE_CONFIDENCE` to `configs/constants.py`.
+
+### Benefits
+
+- Removes all dependency on unsupported `mp.solutions` APIs.
+- Keeps existing architecture and gesture logic intact.
+- Aligns hand tracking with the installed MediaPipe 0.10.35 package.
+- Produces the same normalized landmark shape required by existing gesture detection.
+
+### Tradeoffs
+
+- MediaPipe Tasks requires an external `hand_landmarker.task` model asset.
+- Startup now validates that the model exists and raises a clear setup error if it is missing.
+- The model asset is stored under `assets/models/` rather than bundled through Python package imports.
+
+### Files Changed
+
+- `trackers/hand_tracker.py`
+- `configs/constants.py`
+- `requirements.txt`
+- `README.md`
+- `DEVELOPMENT_LOG.md`
+- `assets/models/.gitkeep`
+
+### Verification
+
+- Compiled all project Python modules successfully.
+- Constructed `GestureOSApplication` successfully with MediaPipe 0.10.35.
+- Opened the webcam through `HandTracker.start()`.
+- Processed 60 webcam frames at `(720, 1280, 3)`.
+- Detected all 21 hand landmarks during the probe.
+- Confirmed no unsupported `mp.solutions` or `solutions.hands.Hands` references remain in source code.
+- Downloaded `assets/models/hand_landmarker.task` for local verification and ignored `assets/models/*.task` in `.gitignore` to avoid committing runtime model binaries.

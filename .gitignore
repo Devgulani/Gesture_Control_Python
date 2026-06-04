@@ -49,6 +49,7 @@ htmlcov/
 # GestureOS generated assets
 assets/screenshots/
 assets/screenshots/*.png
+assets/models/*.task
 
 # OS metadata
 .DS_Store

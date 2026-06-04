@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Dict, Optional, Tuple
 
 import cv2
-import mediapipe as mp
+from mediapipe import Image, ImageFormat
+from mediapipe.tasks.python import vision
+from mediapipe.tasks.python.core.base_options import BaseOptions
 import numpy as np
 
 from configs import constants
@@ -20,18 +23,15 @@ class HandTracker:
     """Owns webcam capture, MediaPipe processing, and landmark visualization."""
 
     def __init__(self) -> None:
-        """Initialize MediaPipe Hands and drawing utilities."""
-        self._hands = mp.solutions.hands.Hands(
-            static_image_mode=False,
-            max_num_hands=constants.MAX_NUM_HANDS,
-            model_complexity=constants.MODEL_COMPLEXITY,
-            min_detection_confidence=constants.MIN_DETECTION_CONFIDENCE,
-            min_tracking_confidence=constants.MIN_TRACKING_CONFIDENCE,
+        """Initialize MediaPipe Tasks hand landmarker and drawing utilities."""
+        self._landmarker = self._create_landmarker()
+        self._drawing = vision.drawing_utils
+        self._drawing_styles = vision.drawing_styles
+        self._hand_connections = (
+            vision.HandLandmarksConnections.HAND_CONNECTIONS
         )
-        self._drawing = mp.solutions.drawing_utils
-        self._drawing_styles = mp.solutions.drawing_styles
-        self._hand_connections = mp.solutions.hands.HAND_CONNECTIONS
         self._capture: Optional[cv2.VideoCapture] = None
+        self._last_timestamp_ms = 0
 
     def start(self) -> None:
         """Open the configured webcam and apply preferred frame dimensions."""
@@ -63,16 +63,23 @@ class HandTracker:
     ) -> Tuple[LandmarkMap, Optional[object]]:
         """Detect one hand and return landmark points plus raw MediaPipe results."""
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = self._hands.process(rgb_frame)
+        media_pipe_image = Image(
+            image_format=ImageFormat.SRGB,
+            data=np.ascontiguousarray(rgb_frame),
+        )
+        results = self._landmarker.detect_for_video(
+            media_pipe_image,
+            self._next_timestamp_ms(),
+        )
 
-        if not results.multi_hand_landmarks:
+        if not results.hand_landmarks:
             return {}, results
 
-        hand_landmarks = results.multi_hand_landmarks[0]
+        hand_landmarks = results.hand_landmarks[0]
         frame_height, frame_width = frame.shape[:2]
         landmarks: LandmarkMap = {}
 
-        for index, landmark in enumerate(hand_landmarks.landmark):
+        for index, landmark in enumerate(hand_landmarks):
             pixel_x = int(landmark.x * frame_width)
             pixel_y = int(landmark.y * frame_height)
             landmarks[index] = Point(
@@ -87,11 +94,11 @@ class HandTracker:
 
     def draw_landmarks(self, frame: np.ndarray, results: object) -> None:
         """Draw hand landmarks and connections on the frame if available."""
-        multi_hand_landmarks = getattr(results, "multi_hand_landmarks", None)
-        if not multi_hand_landmarks:
+        hand_landmarks_list = getattr(results, "hand_landmarks", None)
+        if not hand_landmarks_list:
             return
 
-        for hand_landmarks in multi_hand_landmarks:
+        for hand_landmarks in hand_landmarks_list:
             self._drawing.draw_landmarks(
                 frame,
                 hand_landmarks,
@@ -105,5 +112,37 @@ class HandTracker:
         if self._capture is not None:
             self._capture.release()
             self._capture = None
-        self._hands.close()
+        self._landmarker.close()
         logging.info("Hand tracking resources released")
+
+    def _create_landmarker(self) -> vision.HandLandmarker:
+        """Create a MediaPipe Tasks hand landmarker for video frames."""
+        model_path = constants.HAND_LANDMARKER_MODEL_PATH
+        if not model_path.exists():
+            raise FileNotFoundError(
+                "MediaPipe hand landmarker model not found at "
+                f"{model_path}. Download hand_landmarker.task into "
+                "assets/models before starting GestureOS."
+            )
+
+        options = vision.HandLandmarkerOptions(
+            base_options=BaseOptions(model_asset_path=str(model_path)),
+            running_mode=vision.RunningMode.VIDEO,
+            num_hands=constants.MAX_NUM_HANDS,
+            min_hand_detection_confidence=(
+                constants.MIN_DETECTION_CONFIDENCE
+            ),
+            min_hand_presence_confidence=(
+                constants.MIN_HAND_PRESENCE_CONFIDENCE
+            ),
+            min_tracking_confidence=constants.MIN_TRACKING_CONFIDENCE,
+        )
+        return vision.HandLandmarker.create_from_options(options)
+
+    def _next_timestamp_ms(self) -> int:
+        """Return a strictly increasing timestamp for video-mode inference."""
+        timestamp_ms = int(time.perf_counter() * 1000)
+        if timestamp_ms <= self._last_timestamp_ms:
+            timestamp_ms = self._last_timestamp_ms + 1
+        self._last_timestamp_ms = timestamp_ms
+        return timestamp_ms

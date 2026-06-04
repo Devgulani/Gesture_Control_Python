@@ -6,6 +6,7 @@ behavior can be adjusted without changing core logic.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Final, Tuple
 
 
@@ -21,6 +22,13 @@ MAX_NUM_HANDS: Final[int] = 1
 MODEL_COMPLEXITY: Final[int] = 1
 MIN_DETECTION_CONFIDENCE: Final[float] = 0.7
 MIN_TRACKING_CONFIDENCE: Final[float] = 0.7
+MIN_HAND_PRESENCE_CONFIDENCE: Final[float] = 0.7
+HAND_LANDMARKER_MODEL_PATH: Final[Path] = (
+    Path(__file__).resolve().parents[1]
+    / "assets"
+    / "models"
+    / "hand_landmarker.task"
+)
 
 CURSOR_DEAD_ZONE_PX: Final[int] = 5
 CURSOR_SMOOTHING_FACTOR: Final[float] = 0.25
