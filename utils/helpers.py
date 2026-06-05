@@ -16,7 +16,7 @@ from configs import constants
 T = TypeVar("T", int, float)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Point:
     """A normalized and pixel coordinate pair for a hand landmark."""
 
@@ -64,7 +64,7 @@ def draw_status_panel(
     """Draw a compact status overlay on the camera frame."""
     rows_list = list(rows)
     x, y = constants.OVERLAY_ORIGIN
-    panel_width = 470
+    panel_width = constants.OVERLAY_PANEL_WIDTH
     panel_height = constants.OVERLAY_LINE_HEIGHT * len(rows_list) + 22
 
     cv2.rectangle(

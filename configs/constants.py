@@ -14,8 +14,15 @@ APP_NAME: Final[str] = "GestureOS"
 WINDOW_NAME: Final[str] = "GestureOS - Touchless Control"
 
 CAMERA_INDEX: Final[int] = 0
-CAMERA_WIDTH: Final[int] = 1280
-CAMERA_HEIGHT: Final[int] = 720
+SUPPORTED_CAMERA_RESOLUTIONS: Final[Tuple[Tuple[int, int], ...]] = (
+    (640, 480),
+    (960, 540),
+    (1280, 720),
+)
+CAMERA_WIDTH: Final[int] = 640
+CAMERA_HEIGHT: Final[int] = 480
+CAMERA_TARGET_FPS: Final[int] = 60
+CAMERA_BUFFER_SIZE: Final[int] = 1
 FRAME_FLIP_HORIZONTAL: Final[bool] = True
 
 MAX_NUM_HANDS: Final[int] = 1
@@ -30,8 +37,8 @@ HAND_LANDMARKER_MODEL_PATH: Final[Path] = (
     / "hand_landmarker.task"
 )
 
-CURSOR_DEAD_ZONE_PX: Final[int] = 5
-CURSOR_SMOOTHING_FACTOR: Final[float] = 0.25
+CURSOR_DEAD_ZONE_PX: Final[int] = 3
+CURSOR_SMOOTHING_FACTOR: Final[float] = 0.45
 CURSOR_BOUNDARY_MARGIN_RATIO: Final[float] = 0.12
 
 LEFT_CLICK_COOLDOWN_SECONDS: Final[float] = 0.45
@@ -45,11 +52,14 @@ EXIT_HOLD_SECONDS: Final[float] = 2.0
 
 SCROLL_AMOUNT: Final[int] = 5
 FPS_AVERAGING_WINDOW: Final[int] = 10
+ENABLE_LANDMARK_DRAWING: Final[bool] = True
+LANDMARK_DRAW_INTERVAL_FRAMES: Final[int] = 1
 
 OVERLAY_ORIGIN: Final[Tuple[int, int]] = (20, 34)
-OVERLAY_LINE_HEIGHT: Final[int] = 32
-OVERLAY_FONT_SCALE: Final[float] = 0.75
+OVERLAY_LINE_HEIGHT: Final[int] = 27
+OVERLAY_FONT_SCALE: Final[float] = 0.62
 OVERLAY_FONT_THICKNESS: Final[int] = 2
+OVERLAY_PANEL_WIDTH: Final[int] = 500
 OVERLAY_TEXT_COLOR: Final[Tuple[int, int, int]] = (235, 245, 255)
 OVERLAY_ACCENT_COLOR: Final[Tuple[int, int, int]] = (72, 219, 251)
 OVERLAY_WARNING_COLOR: Final[Tuple[int, int, int]] = (0, 195, 255)

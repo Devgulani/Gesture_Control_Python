@@ -32,6 +32,11 @@ class HandTracker:
         )
         self._capture: Optional[cv2.VideoCapture] = None
         self._last_timestamp_ms = 0
+        self._frame_index = 0
+        self._camera_resolution = (
+            constants.CAMERA_WIDTH,
+            constants.CAMERA_HEIGHT,
+        )
 
     def start(self) -> None:
         """Open the configured webcam and apply preferred frame dimensions."""
@@ -41,7 +46,13 @@ class HandTracker:
 
         self._capture.set(cv2.CAP_PROP_FRAME_WIDTH, constants.CAMERA_WIDTH)
         self._capture.set(cv2.CAP_PROP_FRAME_HEIGHT, constants.CAMERA_HEIGHT)
-        logging.info("Webcam initialized")
+        self._capture.set(cv2.CAP_PROP_FPS, constants.CAMERA_TARGET_FPS)
+        self._capture.set(cv2.CAP_PROP_BUFFERSIZE, constants.CAMERA_BUFFER_SIZE)
+        self._camera_resolution = (
+            int(self._capture.get(cv2.CAP_PROP_FRAME_WIDTH)),
+            int(self._capture.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+        )
+        logging.info("Webcam initialized at %sx%s", *self._camera_resolution)
 
     def read_frame(self) -> Optional[np.ndarray]:
         """Read a frame from the webcam, returning None if capture fails."""
@@ -94,6 +105,13 @@ class HandTracker:
 
     def draw_landmarks(self, frame: np.ndarray, results: object) -> None:
         """Draw hand landmarks and connections on the frame if available."""
+        if not constants.ENABLE_LANDMARK_DRAWING:
+            return
+
+        self._frame_index += 1
+        if self._frame_index % constants.LANDMARK_DRAW_INTERVAL_FRAMES != 0:
+            return
+
         hand_landmarks_list = getattr(results, "hand_landmarks", None)
         if not hand_landmarks_list:
             return
@@ -114,6 +132,11 @@ class HandTracker:
             self._capture = None
         self._landmarker.close()
         logging.info("Hand tracking resources released")
+
+    @property
+    def camera_resolution(self) -> Tuple[int, int]:
+        """Return the active webcam capture resolution."""
+        return self._camera_resolution
 
     def _create_landmarker(self) -> vision.HandLandmarker:
         """Create a MediaPipe Tasks hand landmarker for video frames."""

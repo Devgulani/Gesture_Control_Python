@@ -28,6 +28,9 @@ class MouseController:
     def __init__(self) -> None:
         """Initialize screen geometry, smoothing state, and click cooldowns."""
         pyautogui.FAILSAFE = True
+        pyautogui.PAUSE = 0
+        pyautogui.MINIMUM_DURATION = 0
+        pyautogui.MINIMUM_SLEEP = 0
         self._screen_width, self._screen_height = pyautogui.size()
         self._smoothed_x = self._screen_width / 2
         self._smoothed_y = self._screen_height / 2

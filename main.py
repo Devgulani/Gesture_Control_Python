@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
+from typing import Optional
 
 import cv2
 
@@ -20,6 +22,8 @@ class ApplicationState:
 
     running: bool = True
     system_status: str = "Initializing"
+    frame_processing_ms: float = 0.0
+    detection_confidence: Optional[float] = None
 
 
 class GestureOSApplication:
@@ -42,6 +46,7 @@ class GestureOSApplication:
             self._state.system_status = "Ready"
 
             while self._state.running:
+                frame_started_at = time.perf_counter()
                 frame = self._tracker.read_frame()
                 if frame is None:
                     self._state.system_status = "Camera frame unavailable"
@@ -54,6 +59,7 @@ class GestureOSApplication:
                 self._mouse_controller.handle_gesture(gesture, index_tip)
                 self._tracker.draw_landmarks(frame, results)
                 fps = self._fps_counter.update()
+                self._state.detection_confidence = self._extract_confidence(results)
 
                 if gesture.is_exit_ready:
                     self._state.system_status = "Exit gesture confirmed"
@@ -66,6 +72,9 @@ class GestureOSApplication:
                 else:
                     self._state.system_status = self._mouse_controller.status.message
 
+                self._state.frame_processing_ms = (
+                    time.perf_counter() - frame_started_at
+                ) * 1000
                 self._render_overlay(frame, fps, landmarks, gesture.name.value)
                 cv2.imshow(constants.WINDOW_NAME, frame)
 
@@ -90,9 +99,21 @@ class GestureOSApplication:
     ) -> None:
         """Render application status on the OpenCV frame."""
         hand_status = "Detected" if landmarks else "Not detected"
+        width, height = self._tracker.camera_resolution
+        confidence = (
+            f"{self._state.detection_confidence:.2f}"
+            if self._state.detection_confidence is not None
+            else "n/a"
+        )
         rows = [
             (f"{constants.APP_NAME} | FPS: {fps:.1f}", constants.OVERLAY_ACCENT_COLOR),
+            (
+                f"Frame: {self._state.frame_processing_ms:.1f} ms | "
+                f"Camera: {width}x{height}",
+                constants.OVERLAY_TEXT_COLOR,
+            ),
             (f"Hand: {hand_status}", constants.OVERLAY_TEXT_COLOR),
+            (f"Detection Confidence: {confidence}", constants.OVERLAY_TEXT_COLOR),
             (f"Gesture: {gesture_name}", constants.OVERLAY_TEXT_COLOR),
             (
                 f"Mouse Mode: {self._mouse_controller.status.mouse_mode}",
@@ -102,6 +123,15 @@ class GestureOSApplication:
             ("Press Q or hold a closed fist for 2s to exit", constants.OVERLAY_TEXT_COLOR),
         ]
         draw_status_panel(frame, rows)
+
+    @staticmethod
+    def _extract_confidence(results: object) -> Optional[float]:
+        """Return the top hand detection confidence when MediaPipe provides it."""
+        handedness = getattr(results, "handedness", None)
+        if not handedness or not handedness[0]:
+            return None
+        score = getattr(handedness[0][0], "score", None)
+        return float(score) if score is not None else None
 
     def _shutdown(self) -> None:
         """Release resources and close OpenCV windows."""

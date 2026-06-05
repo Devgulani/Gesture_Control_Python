@@ -151,3 +151,54 @@ MediaPipe `0.10.35` in the current Python 3.14.3 environment is packaged around 
 - Detected all 21 hand landmarks during the probe.
 - Confirmed no unsupported `mp.solutions` or `solutions.hands.Hands` references remain in source code.
 - Downloaded `assets/models/hand_landmarker.task` for local verification and ignored `assets/models/*.task` in `.gitignore` to avoid committing runtime model binaries.
+
+## 2026-06-05 - Performance and Documentation Optimization
+
+### Bottlenecks Identified
+
+- The default camera resolution was `1280x720`, which increases MediaPipe inference work and can hold FPS near 30 on typical laptop hardware.
+- Cursor smoothing used a conservative `0.25` smoothing factor, which reduced jitter but added noticeable pointer lag.
+- PyAutoGUI retained default pause and duration behavior, which can add small delays to repeated mouse actions.
+- Runtime diagnostics did not show frame processing time, active camera resolution, or detection confidence, making tuning harder.
+- Controls were documented only as a short README list, with no dedicated `CONTROLS.md`.
+
+### Optimizations Applied
+
+- Changed the default camera resolution to `640x480`.
+- Added supported camera resolution presets in `configs/constants.py`: `640x480`, `960x540`, and `1280x720`.
+- Added `CAMERA_TARGET_FPS` and `CAMERA_BUFFER_SIZE` constants.
+- Requested low camera buffering with `cv2.CAP_PROP_BUFFERSIZE`.
+- Added active camera resolution tracking to `HandTracker`.
+- Added frame processing time diagnostics to the OpenCV overlay.
+- Added MediaPipe handedness confidence display when available.
+- Made landmark drawing configurable with `ENABLE_LANDMARK_DRAWING` and `LANDMARK_DRAW_INTERVAL_FRAMES`.
+- Reduced overlay font size and line height to keep the expanded diagnostics compact.
+- Changed `Point` to a slotted frozen dataclass to reduce per-frame object overhead.
+- Increased `CURSOR_SMOOTHING_FACTOR` from `0.25` to `0.45` for lower perceived latency.
+- Reduced `CURSOR_DEAD_ZONE_PX` from `5` to `3` for finer pointer response.
+- Disabled PyAutoGUI pause and minimum duration in `MouseController`.
+
+### Before And After Performance Notes
+
+- Before: user-reported average runtime performance was approximately 30 FPS with functional but slower-than-desired cursor response.
+- After: code defaults to performance-oriented `640x480`, requests 60 FPS capture, reduces cursor smoothing lag, lowers capture buffering, and exposes diagnostics for live tuning.
+- A local webcam benchmark attempt during this update stalled inside the camera driver and timed out without reliable numeric output. Earlier verification confirmed webcam and hand landmark detection worked, and this change was compile-verified after optimization.
+
+### Documentation Updates
+
+- Added an early README Controls section with a gesture/action/mode table.
+- Added README Performance, recommended camera settings, expected FPS ranges, and tuning guidance.
+- Added runtime diagnostics documentation.
+- Added reserved future gestures to README.
+- Created `CONTROLS.md` to document implemented controls, thresholds, cooldowns, modes, troubleshooting, and reserved gestures.
+
+### Files Changed
+
+- `configs/constants.py`
+- `controllers/mouse_controller.py`
+- `main.py`
+- `trackers/hand_tracker.py`
+- `utils/helpers.py`
+- `README.md`
+- `CONTROLS.md`
+- `DEVELOPMENT_LOG.md`
