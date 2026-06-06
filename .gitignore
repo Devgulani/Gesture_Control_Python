@@ -12,7 +12,7 @@ venv/
 env/
 ENV/
 
-# Environment and local configuration
+# Environment variables
 .env
 .env.*
 !.env.example
@@ -46,12 +46,31 @@ htmlcov/
 .tox/
 .nox/
 
-# GestureOS generated assets
-assets/screenshots/
-assets/screenshots/*.png
-assets/models/*.task
+# Runtime screenshots — ignore contents but keep folder
+assets/screenshots/*
+!assets/screenshots/.gitkeep
 
-# OS metadata
+# MediaPipe model files — ignore contents but keep folder
+assets/models/*
+!assets/models/.gitkeep
+
+# OS metadata files
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Local databases
+*.db
+*.sqlite3
+
+# Cursor / OpenCode editor config
+.cursor/
+.opencode/
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/

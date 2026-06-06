@@ -8,10 +8,11 @@ from dataclasses import dataclass
 from typing import Optional
 
 import cv2
+import numpy as np
 
 from configs import constants
-from controllers.mouse_controller import MouseController
 from gestures.gesture_detector import GestureDetector
+from modes.mode_manager import ModeManager
 from trackers.hand_tracker import HandTracker, LandmarkMap
 from utils.helpers import FPSCounter, draw_status_panel
 
@@ -29,14 +30,12 @@ class ApplicationState:
 class GestureOSApplication:
     """Coordinates camera tracking, gesture recognition, control, and rendering."""
 
-    INDEX_TIP = 8
-
     def __init__(self) -> None:
         """Create application modules and runtime state."""
         self._state = ApplicationState()
         self._tracker = HandTracker()
         self._detector = GestureDetector()
-        self._mouse_controller = MouseController()
+        self._mode_manager = ModeManager()
         self._fps_counter = FPSCounter()
 
     def run(self) -> None:
@@ -54,28 +53,35 @@ class GestureOSApplication:
 
                 landmarks, results = self._tracker.process_frame(frame)
                 gesture = self._detector.detect(landmarks)
-                index_tip = landmarks.get(self.INDEX_TIP)
 
-                self._mouse_controller.handle_gesture(gesture, index_tip)
+                self._mode_manager.handle_gesture(gesture, landmarks)
                 self._tracker.draw_landmarks(frame, results)
                 fps = self._fps_counter.update()
                 self._state.detection_confidence = self._extract_confidence(results)
 
-                if gesture.is_exit_ready:
+                now = time.perf_counter()
+                if self._mode_manager.exit_requested:
                     self._state.system_status = "Exit gesture confirmed"
                     self._state.running = False
                 elif not landmarks:
                     self._state.system_status = "Waiting for hand"
                 elif gesture.exit_progress > 0:
-                    percent = int(gesture.exit_progress * 100)
-                    self._state.system_status = f"Hold fist to exit: {percent}%"
+                    progress_val = gesture.exit_progress
+                    hold_target = constants.EXIT_HOLD_SECONDS
+                    elapsed = progress_val * hold_target
+                    self._state.system_status = (
+                        f"Exit Gesture Detected — Holding {elapsed:.1f} / {hold_target:.0f}s"
+                    )
                 else:
-                    self._state.system_status = self._mouse_controller.status.message
+                    self._state.system_status = (
+                        self._mode_manager.active_controller.status.message
+                    )
 
                 self._state.frame_processing_ms = (
                     time.perf_counter() - frame_started_at
                 ) * 1000
                 self._render_overlay(frame, fps, landmarks, gesture.name.value)
+                self._render_volume_bar(frame)
                 cv2.imshow(constants.WINDOW_NAME, frame)
 
                 if cv2.waitKey(1) & 0xFF == constants.EXIT_KEY:
@@ -92,7 +98,7 @@ class GestureOSApplication:
 
     def _render_overlay(
         self,
-        frame,
+        frame: np.ndarray,
         fps: float,
         landmarks: LandmarkMap,
         gesture_name: str,
@@ -105,6 +111,8 @@ class GestureOSApplication:
             if self._state.detection_confidence is not None
             else "n/a"
         )
+
+        mode_data = self._mode_manager.get_overlay_data()
         rows = [
             (f"{constants.APP_NAME} | FPS: {fps:.1f}", constants.OVERLAY_ACCENT_COLOR),
             (
@@ -114,15 +122,60 @@ class GestureOSApplication:
             ),
             (f"Hand: {hand_status}", constants.OVERLAY_TEXT_COLOR),
             (f"Detection Confidence: {confidence}", constants.OVERLAY_TEXT_COLOR),
-            (f"Gesture: {gesture_name}", constants.OVERLAY_TEXT_COLOR),
-            (
-                f"Mouse Mode: {self._mouse_controller.status.mouse_mode}",
-                constants.OVERLAY_SUCCESS_COLOR,
-            ),
-            (f"Status: {self._state.system_status}", constants.OVERLAY_WARNING_COLOR),
-            ("Press Q or hold a closed fist for 2s to exit", constants.OVERLAY_TEXT_COLOR),
         ]
+        rows.extend(mode_data.extra_lines)
+
+        lock_parts = []
+        mm = self._mode_manager
+        if mm.state_lock_label:
+            lock_parts.append(f"Lock: {mm.state_lock_label}")
+        cooldown = mm.mode_switch_cooldown_remaining
+        if cooldown > 0:
+            lock_parts.append(f"Cooldown: {cooldown:.1f}s")
+        if lock_parts:
+            rows.append(
+                (" | ".join(lock_parts), constants.OVERLAY_WARNING_COLOR),
+            )
+
+        rows.append(
+            (f"Status: {self._state.system_status}", constants.OVERLAY_WARNING_COLOR),
+        )
+        rows.append(
+            ("Press Q or hold a closed fist for 2s to exit",
+             constants.OVERLAY_TEXT_COLOR),
+        )
         draw_status_panel(frame, rows)
+
+    def _render_volume_bar(self, frame: np.ndarray) -> None:
+        """Render a volume bar overlay when Volume Mode is active."""
+        if self._mode_manager.active_mode != ModeManager.MODE_VOLUME:
+            return
+
+        from controllers.volume_controller import VolumeController
+        volume_ctrl: VolumeController = self._mode_manager.active_controller  # type: ignore[assignment]
+        volume = volume_ctrl.current_volume
+        normalized = volume_ctrl.smoothed_normalized_distance
+
+        x = constants.VOLUME_BAR_X
+        y = constants.VOLUME_BAR_Y
+        bar_w = constants.VOLUME_BAR_WIDTH
+        bar_h = constants.VOLUME_BAR_HEIGHT
+
+        cv2.rectangle(frame, (x, y), (x + bar_w, y + bar_h),
+                      constants.VOLUME_BAR_BG_COLOR, thickness=-1)
+        fill_w = int(bar_w * normalized)
+        cv2.rectangle(frame, (x, y), (x + fill_w, y + bar_h),
+                      constants.VOLUME_BAR_COLOR, thickness=-1)
+        cv2.putText(
+            frame,
+            f"Volume: {volume}%",
+            (x, y - 6),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            constants.OVERLAY_FONT_SCALE,
+            constants.OVERLAY_TEXT_COLOR,
+            constants.OVERLAY_FONT_THICKNESS,
+            cv2.LINE_AA,
+        )
 
     @staticmethod
     def _extract_confidence(results: object) -> Optional[float]:

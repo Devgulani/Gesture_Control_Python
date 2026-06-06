@@ -43,14 +43,17 @@ CURSOR_BOUNDARY_MARGIN_RATIO: Final[float] = 0.12
 
 LEFT_CLICK_COOLDOWN_SECONDS: Final[float] = 0.45
 RIGHT_CLICK_COOLDOWN_SECONDS: Final[float] = 0.65
-SCROLL_COOLDOWN_SECONDS: Final[float] = 0.08
+SCROLL_COOLDOWN_SECONDS: Final[float] = 0.04
+CLICK_LOCK_DURATION: Final[float] = 0.3
 
 PINCH_DISTANCE_THRESHOLD: Final[float] = 0.055
 SCROLL_DISTANCE_THRESHOLD: Final[float] = 0.075
 FIST_FINGER_TIP_TO_WRIST_THRESHOLD: Final[float] = 0.22
+FIST_FINGER_FOLD_THRESHOLD: Final[float] = 0.15
+FIST_HOLD_JITTER_THRESHOLD: Final[float] = 0.15
 EXIT_HOLD_SECONDS: Final[float] = 2.0
 
-SCROLL_AMOUNT: Final[int] = 5
+SCROLL_AMOUNT: Final[int] = 15
 FPS_AVERAGING_WINDOW: Final[int] = 10
 ENABLE_LANDMARK_DRAWING: Final[bool] = True
 LANDMARK_DRAW_INTERVAL_FRAMES: Final[int] = 1
@@ -65,5 +68,35 @@ OVERLAY_ACCENT_COLOR: Final[Tuple[int, int, int]] = (72, 219, 251)
 OVERLAY_WARNING_COLOR: Final[Tuple[int, int, int]] = (0, 195, 255)
 OVERLAY_SUCCESS_COLOR: Final[Tuple[int, int, int]] = (80, 220, 120)
 OVERLAY_BACKGROUND_COLOR: Final[Tuple[int, int, int]] = (18, 24, 32)
+
+MODE_SWITCH_HOLD_SECONDS: Final[float] = 2.0
+MODE_SWITCH_COOLDOWN_SECONDS: Final[float] = 1.5
+VOLUME_TRANSITION_DELAY: Final[float] = 0.75
+
+VOLUME_SMOOTHING_FACTOR: Final[float] = 0.3
+VOLUME_MIN_DISTANCE: Final[float] = 0.02
+VOLUME_MAX_DISTANCE: Final[float] = 0.15
+VOLUME_COOLDOWN_SECONDS: Final[float] = 0.05
+
+MEDIA_COOLDOWN_SECONDS: Final[float] = 0.5
+SWIPE_THRESHOLD: Final[float] = 0.15
+SWIPE_COOLDOWN_SECONDS: Final[float] = 0.5
+
+SCREENSHOT_COOLDOWN_SECONDS: Final[float] = 2.0
+SCREENSHOT_HOLD_SECONDS: Final[float] = 0.3
+THREE_FINGER_PINCH_THRESHOLD: Final[float] = 0.065
+
+OPEN_HAND_FINGER_TIP_TO_WRIST_THRESHOLD: Final[float] = 0.25
+
+VOLUME_BAR_X: Final[int] = 30
+VOLUME_BAR_Y: Final[int] = 400
+VOLUME_BAR_WIDTH: Final[int] = 300
+VOLUME_BAR_HEIGHT: Final[int] = 22
+VOLUME_BAR_COLOR: Final[Tuple[int, int, int]] = (80, 220, 120)
+VOLUME_BAR_BG_COLOR: Final[Tuple[int, int, int]] = (50, 50, 50)
+
+SCREENSHOTS_DIR: Final[Path] = (
+    Path(__file__).resolve().parents[1] / "assets" / "screenshots"
+)
 
 EXIT_KEY: Final[int] = ord("q")

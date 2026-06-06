@@ -4,29 +4,25 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass
 from typing import Tuple
 
 import pyautogui
 
 from configs import constants
+from controllers.base_controller import BaseController, OverlayData
 from gestures.gesture_detector import GestureResult
+from trackers.hand_tracker import LandmarkMap
 from utils.helpers import Point, clamp
 
 
-@dataclass
-class ControllerStatus:
-    """Human-readable action state for the OpenCV overlay."""
-
-    message: str = "Ready"
-    mouse_mode: str = "Idle"
-
-
-class MouseController:
+class MouseController(BaseController):
     """Maps hand landmarks to mouse actions using PyAutoGUI."""
+
+    INDEX_TIP = 8
 
     def __init__(self) -> None:
         """Initialize screen geometry, smoothing state, and click cooldowns."""
+        super().__init__()
         pyautogui.FAILSAFE = True
         pyautogui.PAUSE = 0
         pyautogui.MINIMUM_DURATION = 0
@@ -39,26 +35,35 @@ class MouseController:
         self._last_scroll_at = 0.0
         self._left_pinch_active = False
         self._right_pinch_active = False
-        self.status = ControllerStatus()
+        self._click_lock_until = 0.0
 
     def handle_gesture(
         self,
         gesture: GestureResult,
-        index_tip: Point | None,
+        landmarks: LandmarkMap,
     ) -> None:
         """Run the OS action associated with a detected gesture."""
+        now = time.perf_counter()
+
         if gesture.is_left_pinch:
             self._click("left")
             self.status.mouse_mode = "Click"
+            self._click_lock_until = now + constants.CLICK_LOCK_DURATION
             return
 
+        if self._left_pinch_active:
+            # Pinch just released — freeze briefly to prevent cursor jump
+            self._click_lock_until = now + constants.CLICK_LOCK_DURATION
         self._left_pinch_active = False
 
         if gesture.is_right_pinch:
             self._click("right")
             self.status.mouse_mode = "Context"
+            self._click_lock_until = now + constants.CLICK_LOCK_DURATION
             return
 
+        if self._right_pinch_active:
+            self._click_lock_until = now + constants.CLICK_LOCK_DURATION
         self._right_pinch_active = False
 
         if gesture.is_scrolling:
@@ -66,6 +71,11 @@ class MouseController:
             self.status.mouse_mode = "Scroll"
             return
 
+        if now < self._click_lock_until:
+            self.status.mouse_mode = "Locked"
+            return
+
+        index_tip = landmarks.get(self.INDEX_TIP)
         if index_tip is not None:
             self.move_cursor(index_tip)
             self.status.mouse_mode = "Move"
@@ -73,6 +83,18 @@ class MouseController:
 
         self.status.mouse_mode = "Idle"
         self.status.message = "Show one hand to begin"
+
+    def get_overlay_data(self) -> OverlayData:
+        """Return mouse mode overlay data."""
+        return OverlayData(
+            message=self.status.message,
+            mode_status=f"Mouse Mode: {self.status.mouse_mode}",
+        )
+
+    @property
+    def is_click_locked(self) -> bool:
+        """Return True while cursor is frozen after a click or pinch release."""
+        return time.perf_counter() < self._click_lock_until
 
     def move_cursor(self, index_tip: Point) -> None:
         """Move the cursor using smoothed index-finger coordinates."""
