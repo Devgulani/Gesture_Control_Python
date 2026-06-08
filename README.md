@@ -1,262 +1,609 @@
 # GestureOS
 
-GestureOS is a real-time Python computer vision project for touchless computer control. It uses a webcam to detect one hand, tracks MediaPipe hand landmarks, recognizes gestures, and maps those gestures to mouse movement, clicks, scrolling, volume control, media playback, and screenshot capture.
+Real-time AI-powered touchless computer control using MediaPipe, OpenCV, and gesture recognition.
 
-The project is designed as a professional portfolio codebase: small modules, clear responsibilities, type hints, centralized configuration, and documentation that supports future expansion without turning the MVP into a monolith.
+GestureOS is a computer vision project that transforms hand gestures into computer actions using a webcam. It combines real-time hand tracking, gesture recognition, mode-based controls, and system automation to create a touchless human-computer interaction experience.
+
+Features include:
+
+* Mouse Control
+* Volume Control
+* Media Control
+* Screenshot Capture
+* Modular Mode System
+* Real-Time Gesture Recognition
+* Performance Diagnostics
+
+---
+
+## Why GestureOS?
+
+GestureOS is more than a virtual mouse project.
+
+The system is built using a modular architecture that separates hand tracking, gesture recognition, mode management, and controller logic. This design allows new interaction modes and gesture-based workflows to be added without major refactoring.
+
+Key engineering goals:
+
+* Modular architecture
+* Real-time performance
+* Reliable gesture recognition
+* Extensible mode system
+* Professional software engineering practices
+* Future AI integration
+
+---
 
 ## Features
 
-- Real-time one-hand detection from webcam input
-- MediaPipe landmark rendering in the OpenCV camera window
-- FPS, frame processing time, camera resolution, detection confidence, active gesture, system status, and mouse mode overlays
-- Index-finger cursor movement with coordinate mapping and smoothing
-- Thumb-index pinch left click with held-pinch protection and cooldown
-- Thumb-middle pinch right click with held-pinch protection and cooldown
-- Two-finger vertical scroll gesture with rate limiting
-- **Volume control** via thumb-index distance
-- **Media playback control** (play/pause, next, previous)
-- **Screenshot capture** via three-finger pinch
-- **Mode system**: Mouse, Volume, and Media modes
-- Closed-fist hold exit gesture with safe webcam and OpenCV cleanup
-- Keyboard exit with `Q`
+### Computer Vision
 
-## Controls
+* Real-time webcam hand tracking
+* MediaPipe Tasks API hand landmark detection
+* Single-hand gesture recognition
+* Landmark visualization
+* Gesture confidence tracking
 
-Full control documentation is in `CONTROLS.md`.
+### Mouse Control
 
-### Mouse Mode (Default)
+* Cursor movement using index finger
+* Left click using thumb-index pinch
+* Right click using thumb-middle pinch
+* Smooth scrolling
+* Cursor stabilization and click locking
 
-| Gesture | Action |
-| --- | --- |
-| Index finger raised and moved | Move cursor |
-| Thumb + index pinch | Left click |
-| Thumb + middle pinch | Right click |
-| Index + middle fingers extended, offset vertically | Scroll |
-| Open hand held 2s | Switch to Volume Mode |
-| Peace sign held 2s | Switch to Media Mode |
+### Productivity Controls
 
-### Volume Mode
+* System volume control
+* Media playback controls
+* Screenshot capture
+* Mode switching
 
-| Gesture | Action |
-| --- | --- |
-| Adjust thumb-index distance | Set system volume |
-| Open hand held 2s | Return to Mouse Mode |
+### User Experience
 
-### Media Mode
+* Real-time FPS display
+* Detection confidence display
+* Current gesture display
+* Current mode display
+* Status overlays
+* Gesture cooldown system
+* State locking system
 
-| Gesture | Action |
-| --- | --- |
-| Open palm | Play / Pause |
-| Swipe right | Next Track |
-| Swipe left | Previous Track |
-| Peace sign held 2s | Return to Mouse Mode |
+### Safety Features
 
-### Global Controls
+* Closed-fist exit gesture
+* Keyboard exit (`Q`)
+* Mode transition protection
+* Cooldown-based gesture filtering
 
-| Gesture | Action |
-| --- | --- |
-| Closed fist held for 2 seconds | Exit application |
-| Three-finger pinch held briefly | Take screenshot |
-| `Q` key | Exit application |
+---
+
+## Architecture Diagram
+
+```mermaid
+flowchart TD
+
+    Camera[Webcam Input]
+    Tracker[Hand Tracker<br/>MediaPipe Tasks API]
+    Detector[Gesture Detector<br/>Rule-based]
+    AiBridge[AI Bridge<br/>Feature Extraction]
+    ModeManager[Mode Manager]
+
+    MouseController[Mouse Controller]
+    VolumeController[Volume Controller]
+    MediaController[Media Controller]
+    ScreenshotController[Screenshot Controller]
+
+    Overlay[Diagnostics Overlay]
+    System[Operating System Actions]
+
+    Camera --> Tracker
+    Tracker --> Detector
+    Tracker --> AiBridge
+    Detector --> ModeManager
+    AiBridge -.- ModeManager
+
+    ModeManager --> MouseController
+    ModeManager --> VolumeController
+    ModeManager --> MediaController
+
+    Detector --> ScreenshotController
+
+    MouseController --> System
+    VolumeController --> System
+    MediaController --> System
+    ScreenshotController --> System
+
+    Tracker --> Overlay
+    Detector --> Overlay
+    ModeManager --> Overlay
+```
+
+---
+
+## Runtime Flow
+
+```mermaid
+sequenceDiagram
+
+    participant User
+    participant Webcam
+    participant HandTracker
+    participant GestureDetector
+    participant AiBridge
+    participant ModeManager
+    participant Controller
+    participant System
+
+    User->>Webcam: Perform Gesture
+    Webcam->>HandTracker: Video Frame
+    HandTracker->>GestureDetector: Hand Landmarks
+    HandTracker->>AiBridge: Hand Landmarks
+    GestureDetector->>ModeManager: Gesture Result
+    AiBridge-->>ModeManager: (future)
+    ModeManager->>Controller: Route Gesture
+    Controller->>System: Execute Action
+    System-->>User: Visual Feedback
+```
+
+---
+
+## Demo
+
+### GestureOS Interface
+
+(Add application screenshot here)
+
+### Gesture Controls
+
+(Add demonstration GIF here)
+
+### Mode Switching
+
+(Add mode switching GIF here)
+
+---
 
 ## Tech Stack
 
-| Dependency | Recommended Version | Purpose |
-| --- | --- | --- |
-| Python | 3.14.3 | Runtime used by the current project environment |
-| OpenCV | `opencv-python>=4.13.0` | Webcam capture, frame display, drawing text overlays |
-| MediaPipe | `mediapipe==0.10.35` | Tasks-based hand landmark detection and landmark visualization |
-| PyAutoGUI | `pyautogui>=0.9.54` | Mouse movement, clicking, scrolling, media keys |
-| NumPy | `numpy>=2.4.0` | Numeric distance calculations and frame-compatible data handling |
-| pycaw | `pycaw>=20251023` | System audio volume control (Windows) |
-| comtypes | `comtypes>=1.4.0` | Windows COM interop for pycaw |
+| Technology          | Purpose                                       |
+| ------------------- | --------------------------------------------- |
+| Python 3.14.3       | Core application runtime                      |
+| OpenCV              | Webcam capture and rendering                  |
+| MediaPipe Tasks API | Hand tracking and landmark detection          |
+| PyAutoGUI           | Mouse, scrolling, screenshots, media controls |
+| NumPy               | Numerical operations                          |
+| PyCAW               | Windows volume control                        |
+| comtypes            | Windows COM support                           |
 
-## Compatibility Notes
+---
 
-GestureOS currently targets Python 3.14.3 with MediaPipe 0.10.35. This MediaPipe build does not expose the legacy `mp.solutions` namespace, so the tracker uses the supported MediaPipe Tasks Vision API:
+## Controls
 
-```text
-mediapipe.tasks.python.vision.HandLandmarker
+Detailed documentation is available in `CONTROLS.md`.
+
+### Mouse Mode
+
+| Gesture                   | Action                |
+| ------------------------- | --------------------- |
+| Index Finger Movement     | Move Cursor           |
+| Thumb + Index Pinch       | Left Click            |
+| Thumb + Middle Pinch      | Right Click           |
+| Two-Finger Scroll Gesture | Scroll                |
+| Open Hand (Hold 2s)       | Switch to Volume Mode |
+| Peace Sign (Hold 2s)      | Switch to Media Mode  |
+
+### Volume Mode
+
+| Gesture                | Action               |
+| ---------------------- | -------------------- |
+| Thumb ↔ Index Distance | Adjust Volume        |
+| Open Hand (Hold 2s)    | Return to Mouse Mode |
+
+### Media Mode
+
+| Gesture              | Action               |
+| -------------------- | -------------------- |
+| Open Palm            | Play / Pause         |
+| Swipe Right          | Next Track           |
+| Swipe Left           | Previous Track       |
+| Peace Sign (Hold 2s) | Return to Mouse Mode |
+
+### Global Controls
+
+| Gesture               | Action           |
+| --------------------- | ---------------- |
+| Closed Fist (Hold 2s) | Exit Application |
+| Three-Finger Pinch    | Take Screenshot  |
+| Q Key                 | Exit Application |
+
+---
+
+## Installation
+
+### 1. Clone Repository
+
+```bash
+git clone https://github.com/yourusername/GestureOS.git
+cd GestureOS
 ```
 
-The Tasks API requires a model asset. Place the official `hand_landmarker.task` file at:
+### 2. Create Virtual Environment
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+### 3. Install Dependencies
+
+```powershell
+pip install -r requirements.txt
+```
+
+### 4. Download MediaPipe Model
+
+Download:
+
+```text
+hand_landmarker.task
+```
+
+Place it inside:
 
 ```text
 assets/models/hand_landmarker.task
 ```
 
-If the model file is missing, GestureOS raises a clear startup error before opening the webcam.
+Official MediaPipe model:
 
-Volume control requires Windows with `pycaw`. On other platforms, the volume feature degrades gracefully (status displays but system volume is not changed).
+```text
+https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+```
 
-## Performance
-
-GestureOS defaults to `640x480` because MediaPipe inference cost scales with frame size. This is the best default for responsive pointer control and should usually feel faster than `1280x720`.
-
-Supported capture settings are configured in `configs/constants.py`:
-
-| Resolution | Recommended Use | Expected Behavior |
-| --- | --- | --- |
-| `640x480` | Default performance mode | Lowest latency, best chance of 45-60 FPS |
-| `960x540` | Balanced mode | Better image detail with moderate latency |
-| `1280x720` | Quality mode | Best visual detail, highest inference cost |
-
-Key performance constants:
-
-- `CAMERA_WIDTH` / `CAMERA_HEIGHT`: active capture resolution.
-- `CURSOR_SMOOTHING_FACTOR`: higher values follow the hand faster; lower values reduce jitter.
-- `CURSOR_DEAD_ZONE_PX`: filters tiny cursor movements.
-- `ENABLE_LANDMARK_DRAWING`: turns landmark drawing on or off.
-- `VOLUME_SMOOTHING_FACTOR`: smooths volume changes.
-
-Expected FPS depends heavily on CPU, webcam driver, lighting, and background load. On typical laptop hardware, `640x480` should be the first setting to try for 45-60 FPS.
-
-## Installation
-
-1. Create and activate a virtual environment:
-
-   ```powershell
-   python -m venv .venv
-   .\.venv\Scripts\Activate.ps1
-   ```
-
-2. Install dependencies:
-
-   ```powershell
-   pip install -r requirements.txt
-   ```
-
-3. Add the MediaPipe hand landmarker model:
-
-   ```text
-   assets/models/hand_landmarker.task
-   ```
-
-   Official model URL:
-
-   ```text
-   https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
-   ```
-
-4. Confirm that your webcam is connected and available to desktop applications.
-
-## How To Run
+### 5. Run GestureOS
 
 ```powershell
 python main.py
 ```
 
-Gestures are mode-dependent. See `CONTROLS.md` for full details.
+---
 
 ## Project Structure
 
 ```text
 GestureOS/
-|-- main.py
-|-- requirements.txt
-|-- README.md
-|-- DEVELOPMENT_LOG.md
-|-- CONTROLS.md
-|-- modes/
-|   |-- __init__.py
-|   `-- mode_manager.py
-|-- trackers/
-|   |-- __init__.py
-|   `-- hand_tracker.py
-|-- controllers/
-|   |-- __init__.py
-|   |-- base_controller.py
-|   |-- mouse_controller.py
-|   |-- volume_controller.py
-|   |-- media_controller.py
-|   `-- screenshot_controller.py
-|-- gestures/
-|   |-- __init__.py
-|   `-- gesture_detector.py
-|-- utils/
-|   |-- __init__.py
-|   `-- helpers.py
-|-- configs/
-|   |-- __init__.py
-|   `-- constants.py
-`-- assets/
-    |-- screenshots/
-    `-- models/
+│
+├── AGENTS.md
+├── README.md
+├── CONTROLS.md
+├── DEVELOPMENT_LOG.md
+├── requirements.txt
+│
+├── configs/
+│   ├── ai_config.py
+│   └── constants.py
+│
+├── ai/
+│   ├── __init__.py
+│   ├── bridge.py
+│   ├── features/
+│   │   ├── __init__.py
+│   │   └── extractor.py
+│   └── data/
+│       ├── __init__.py
+│       ├── dataset_storage.py
+│       ├── data_augmenter.py
+│       └── gesture_recorder.py
+│
+├── tools/
+│   ├── __init__.py
+│   └── record_gestures.py
+│
+├── profiles/
+│   ├── __init__.py
+│   ├── profile_manager.py
+│   └── profiles/
+│       └── default.json
+│
+├── trackers/
+│   └── hand_tracker.py
+│
+├── gestures/
+│   └── gesture_detector.py
+│
+├── controllers/
+│   ├── base_controller.py
+│   ├── mouse_controller.py
+│   ├── volume_controller.py
+│   ├── media_controller.py
+│   └── screenshot_controller.py
+│
+├── modes/
+│   └── mode_manager.py
+│
+├── utils/
+│   └── helpers.py
+│
+└── assets/
+    ├── models/
+    └── screenshots/
 ```
+
+---
+
+## Performance
+
+GestureOS is optimized for responsiveness and real-time interaction.
+
+Recommended resolutions:
+
+| Resolution | Use Case         |
+| ---------- | ---------------- |
+| 640×480    | Best Performance |
+| 960×540    | Balanced         |
+| 1280×720   | Highest Quality  |
+
+Performance can be tuned through:
+
+* Cursor smoothing
+* Dead zone filtering
+* Scroll sensitivity
+* Gesture thresholds
+* Volume smoothing
+
+All configuration values are centralized in:
+
+```text
+configs/constants.py
+```
+
+---
 
 ## System Architecture
 
-GestureOS separates camera, gesture, control, and rendering concerns:
+Core modules:
 
-- `HandTracker` owns webcam access, MediaPipe initialization, landmark extraction, coordinate conversion, and landmark drawing.
-- `GestureDetector` owns gesture recognition, normalized finger-distance calculations, hold-state tracking, and new gesture detection (open hand, peace sign, three-finger pinch, swipe).
-- `BaseController` is the abstract base class for all mode controllers. It defines the `handle_gesture(gesture, landmarks)` interface.
-- `MouseController`, `VolumeController`, `MediaController` extend `BaseController` and implement mode-specific actions.
-- `ScreenshotController` is a global controller triggered by the three-finger pinch gesture.
-- `ModeManager` owns mode state, routes gestures to the active controller, and handles mode transitions.
-- `GestureOSApplication` owns the main loop, module coordination, overlay rendering, lifecycle, and shutdown.
-- `configs/constants.py` owns configurable thresholds, camera settings, UI colors, cooldown values, and smoothing parameters.
+### HandTracker
 
-## Data Flow
+Responsible for:
 
-```text
-Webcam frame
-  -> HandTracker.read_frame()
-  -> HandTracker.process_frame()
-  -> normalized landmark map
-  -> GestureDetector.detect()
-  -> GestureResult
-  -> ModeManager.handle_gesture()
-    -> (global exit check)
-    -> (global screenshot check)
-    -> (mode switch check)
-    -> active controller handle_gesture()
-  -> PyAutoGUI / system action
-  -> GestureOSApplication overlay rendering
-  -> OpenCV window
+* Webcam access
+* MediaPipe initialization
+* Landmark extraction
+* Coordinate conversion
+* Landmark rendering
+
+### GestureDetector
+
+Responsible for:
+
+* Gesture recognition
+* Hold tracking
+* Swipe detection
+* Pinch detection
+* State management
+
+### Controllers
+
+Responsible for executing actions:
+
+* MouseController
+* VolumeController
+* MediaController
+* ScreenshotController
+
+### ModeManager
+
+Responsible for:
+
+* Mode transitions
+* Gesture routing
+* Cooldowns
+* State locking
+
+### AiGestureBridge
+
+Responsible for:
+
+* Feature extraction (landmarks → feature vectors)
+* Non-blocking integration with the main loop
+* Caching latest feature vector for model inference
+
+### ProfileManager
+
+Responsible for:
+
+* User profile loading and saving
+* Sensitivity and mode preferences
+* Default profile creation
+
+### GestureOSApplication
+
+Responsible for:
+
+* Main loop
+* Overlay rendering
+* Lifecycle management
+* Shutdown handling
+
+---
+
+## AI Foundation
+
+GestureOS includes a modular AI subsystem that runs alongside the rule-based gesture detector. In the current phase, the AI pipeline performs feature extraction only — no model inference, no classification, and no behavioral changes.
+
+### Architecture
+
+The AI subsystem is designed for a future hybrid detection strategy:
+
+- **Phase 1A (current):** Feature extraction engine + profile system + infrastructure. AI bridge runs silently in the background.
+- **Phase 1B:** Data recording and dataset storage.
+- **Phase 2:** Model training and evaluation.
+- **Phase 3:** AI-assisted detection with diagnostic overlay.
+- **Phase 4:** Full hybrid detection with user-selectable modes.
+
+All AI components are optional. If no model exists, the application degrades gracefully to rule-based detection with no code changes.
+
+### Feature Vector
+
+The `FeatureExtractor` transforms 21 MediaPipe hand landmarks into a fixed-length 61-element vector organized into five groups:
+
+| Group | Count | Description | Rationale |
+|---|---|---|---|
+| A — Wrist-relative x,y | 40 | Landmarks 1–20 offset from wrist, normalised by hand size | Eliminates absolute-position overfitting |
+| B — Fingertip distances | 10 | All C(5,2) fingertip pairwise distances, normalised by hand size | Direct pinch/fist/open-hand signal |
+| C — Extension deltas | 5 | tip.y − mcp.y per finger (continuous) | Most discriminative extension signal |
+| D — Bend angle cosines | 5 | cos(θ) at PIP joint using 2D dot products | Rotation-resistant curl information |
+| E — Hand size | 1 | Wrist-to-middle-MCP Euclidean distance | Context and normalisation reference |
+
+The vector is designed to be invariant to hand size, camera distance, and screen resolution. z-coordinates are excluded due to camera-distance sensitivity. No features are redundant — each group provides independent signal.
+
+---
+
+## Dataset Infrastructure (Phase 2)
+
+GestureOS includes a complete pipeline for recording, storing, and augmenting gesture datasets for future ML model training.
+
+### Gesture Recorder
+
+The recorder is a standalone tool that captures labeled hand-landmark feature vectors in real time:
+
+```powershell
+python -m tools.record_gestures
 ```
 
-Runtime diagnostics shown in the OpenCV window:
+| Key | Action |
+| --- | ------ |
+| `0`–`9` | Select gesture-pose label (see below) |
+| `SPACE` | Save current frame as a sample |
+| `R` | Toggle continuous recording mode (auto-saves on hand detection) |
+| `U` | Undo last save |
+| `S` | Show dataset summary |
+| `Q` | Quit |
 
-- FPS
-- Frame processing time in milliseconds
-- Active camera resolution
-- Detection confidence
-- Current mode
-- Active gesture
-- Mode-specific status (volume percentage, media action)
-- System status
+**Gesture-pose labels** (describe hand shape, not action):
+
+| Key | Gesture | Hand Shape Description | Training Set |
+|-----|---------|-----------------------|--------------|
+| `0` | `NO_HAND` | No hand detected / background | Initial |
+| `1` | `POINTING` | Index finger extended, others curled | Initial |
+| `2` | `PINCH_INDEX` | Thumb + index fingertip pinch | Initial |
+| `3` | `PINCH_MIDDLE` | Thumb + middle fingertip pinch | Initial |
+| `4` | `TWO_FINGER_UP` | Index + middle extended upward (scroll direction is rule-based) | Initial |
+| `5` | `OPEN_HAND` | All fingers spread | Initial |
+| `6` | `FIST` | All fingers curled | Initial |
+| `7` | `THREE_FINGER_PINCH` | Thumb + index + middle tips together | Initial |
+| `8` | `PINCH_PINKY` | Thumb + pinky fingertip pinch | Reserved |
+| `9` | `PEACE` | Index + middle V-sign, ring+pinky curled | Initial |
+
+**Training set**: 9 labels used for initial model training.
+**Reserved**: `PINCH_PINKY` — recorded but excluded from initial training. Can be added after baseline is established.
+
+Dynamic gestures (`SWIPE_RIGHT`, `SWIPE_LEFT`) are excluded from the static dataset — they require temporal/sequence-based modeling and are targeted for a future phase.
+
+Each sample stores the 61-element feature vector, raw landmarks (21×3), session ID (auto-generated), profile ID (from ProfileManager), and timestamp.
+
+### Dataset Storage
+
+`DatasetStorage` manages labeled feature vectors on disk:
+
+- `save_sample(label, features, landmarks, session_id, profile_id)` — Save a sample
+- `load_samples(label)` — Load all samples for a label (validates FEATURE_COUNT)
+- `load_landmarks(label)` — Load raw landmarks for re-extraction
+- `load_all()` — Load every labeled sample
+- `delete_sample(label, id)` / `delete_label(label)` — Remove data
+- `export_csv(path)` / `export_json(path)` — Export for external tools
+- `train_test_split(ratio)` — Split for model training
+
+### Data Augmenter
+
+`DataAugmenter` generates synthetic training variations from existing feature vectors:
+
+| Transform | Description |
+| --------- | ----------- |
+| `add_jitter` | Gaussian noise (simulates tracking jitter) |
+| `scale_variation` | Uniform random scale (simulates different hand sizes) |
+| `feature_dropout` | Random zero-out (simulates partial occlusion) |
+| `augment_single(vec, n)` | All three transforms combined for `n` variations |
+| `augment_dataset(features, labels, n)` | Augment an entire dataset |
+
+### Modules
+
+- `configs/ai_config.py` — AI-specific settings (feature count, model paths, thresholds)
+- `ai/features/extractor.py` — Feature extraction pipeline
+- `ai/bridge.py` — Non-blocking bridge between main loop and AI subsystem
+- `profiles/profile_manager.py` — User profile persistence (sensitivity, mode preferences)
+
+---
 
 ## Future Roadmap
 
-These features are planned for future phases:
+Planned future features:
 
-- Presentation Mode
-- Gaming Mode
-- Air Drawing Recognition
-- Custom Gesture Training
-- Gesture Macros
-- Gesture Analytics
-- Multi-Hand Support
-- User Profiles
-- AI-Based Gesture Recognition
+* Presentation Mode
+* Gaming Mode
+* Air Drawing
+* Custom Gesture Training
+* Gesture Macros
+* Gesture Analytics
+* Multi-Hand Support
+* User Profiles
+* AI-Based Gesture Recognition
 
-The mode system and `BaseController` interface are designed so these features can be added as new controllers without refactoring existing code.
+The current architecture is designed to support these additions without major refactoring.
+
+---
 
 ## Troubleshooting
 
-- Webcam does not open: close other camera apps, check OS permissions, and verify `CAMERA_INDEX` in `configs/constants.py`.
-- Low FPS: use `640x480`, close other webcam consumers, and reduce landmark drawing frequency.
-- Cursor feels slow: increase `CURSOR_SMOOTHING_FACTOR` in small steps such as `0.05`.
-- Cursor jumps too quickly: lower `CURSOR_SMOOTHING_FACTOR` or increase `CURSOR_DEAD_ZONE_PX`.
-- Clicks trigger too easily: reduce `PINCH_DISTANCE_THRESHOLD` or increase click cooldowns.
-- Volume control does nothing: install `pycaw` and `comtypes` on Windows.
-- Media keys not working: ensure your media player supports keyboard media keys.
-- Screenshots not saving: verify `assets/screenshots/` exists and is writable.
-- Mode not switching: hold the activation gesture steadily for 2 full seconds. Mode switching has a 1.5s cooldown between switches.
-- MediaPipe install issues: use Python 3.14.3 with `mediapipe==0.10.35`.
-- Missing model file: download `hand_landmarker.task` and place it in `assets/models/`.
+### Low FPS
+
+* Use 640×480 resolution.
+* Close other webcam applications.
+* Improve room lighting.
+
+### Cursor Feels Slow
+
+Adjust:
+
+```text
+CURSOR_SMOOTHING_FACTOR
+```
+
+inside:
+
+```text
+configs/constants.py
+```
+
+### Volume Control Not Working
+
+Ensure:
+
+* Windows is being used.
+* PyCAW is installed.
+* COM permissions are available.
+
+### Model File Missing
+
+Verify:
+
+```text
+assets/models/hand_landmarker.task
+```
+
+exists before starting the application.
+
+### Mode Switching Not Working
+
+Hold the activation gesture continuously for 2 seconds.
+
+A cooldown is applied between mode transitions.
+
+---
 
 ## License
 
-No license has been selected yet. Add a license before publishing or accepting external contributions.
+MIT License recommended.
+
+A license file can be added before public release.

@@ -100,3 +100,7 @@ SCREENSHOTS_DIR: Final[Path] = (
 )
 
 EXIT_KEY: Final[int] = ord("q")
+
+PROFILES_DIR: Final[Path] = (
+    Path(__file__).resolve().parents[1] / "profiles" / "profiles"
+)

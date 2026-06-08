@@ -10,9 +10,11 @@ from typing import Optional
 import cv2
 import numpy as np
 
+from ai.bridge import AiGestureBridge
 from configs import constants
 from gestures.gesture_detector import GestureDetector
 from modes.mode_manager import ModeManager
+from profiles.profile_manager import ProfileManager
 from trackers.hand_tracker import HandTracker, LandmarkMap
 from utils.helpers import FPSCounter, draw_status_panel
 
@@ -37,11 +39,15 @@ class GestureOSApplication:
         self._detector = GestureDetector()
         self._mode_manager = ModeManager()
         self._fps_counter = FPSCounter()
+        self._profile_manager = ProfileManager()
+        self._ai_bridge = AiGestureBridge()
 
     def run(self) -> None:
         """Start GestureOS and process webcam frames until exit."""
         try:
             self._tracker.start()
+            self._profile_manager.active
+            self._ai_bridge.start()
             self._state.system_status = "Ready"
 
             while self._state.running:
@@ -54,6 +60,7 @@ class GestureOSApplication:
                 landmarks, results = self._tracker.process_frame(frame)
                 gesture = self._detector.detect(landmarks)
 
+                self._ai_bridge.process_landmarks(landmarks)
                 self._mode_manager.handle_gesture(gesture, landmarks)
                 self._tracker.draw_landmarks(frame, results)
                 fps = self._fps_counter.update()
@@ -188,6 +195,7 @@ class GestureOSApplication:
 
     def _shutdown(self) -> None:
         """Release resources and close OpenCV windows."""
+        self._ai_bridge.stop()
         self._tracker.release()
         cv2.destroyAllWindows()
         logging.info("GestureOS shutdown complete")

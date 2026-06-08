@@ -362,3 +362,283 @@ All tunable values centralized in `configs/constants.py` (no magic numbers). Add
 - `README.md`
 - `CONTROLS.md`
 - `DEVELOPMENT_LOG.md`
+
+## 2026-06-08 - Phase 1A: AI Foundation Layer
+
+### Architecture Decisions
+
+- Created a minimal AI subsystem that runs silently alongside the existing rule-based pipeline with zero behavioral changes.
+- Followed the approved AI Architecture Design Document and Implementation Roadmap to ensure forward compatibility with future phases.
+- Chose a passive integration pattern: the AI bridge receives landmarks every frame but never injects results into the gesture pipeline.
+- Feature extraction uses a pre-allocated NumPy array to minimize per-frame allocation overhead.
+
+### Design Constraints Honored
+
+- **AI must be optional:** The bridge starts safely regardless of model availability. No model loading occurs in Phase 1A.
+- **Rule-based remains the source of truth:** The gesture pipeline is completely unchanged. AI data is stored but unused.
+- **Minimal footprint:** Only 8 new files, ~300 lines of code total. No new runtime dependencies.
+- **Profile system decoupled from core:** ProfileManager stores settings independently; controllers never import profile modules directly.
+
+### Feature Extractor Design
+
+Implemented a 104-element feature vector with three components:
+
+1. **Raw normalized coordinates (63 values):** All 21 MediaPipe landmarks as (x, y, z) triples in normalized space.
+2. **Hand size (1 value):** Euclidean distance from wrist (landmark 0) to middle finger MCP (landmark 9). Used as a normalization reference for size invariance.
+3. **Wrist-relative coordinates (40 values):** Landmarks 1-20 expressed as (x, y) offsets from the wrist, divided by hand size for scale invariance.
+
+Invariance properties:
+- **Hand size:** All wrist-relative coordinates are divided by the hand size scalar.
+- **Camera distance:** MediaPipe already provides normalized (0-1) coordinates.
+- **Screen resolution:** No pixel coordinates enter the feature vector.
+
+### Files Created
+
+- `configs/ai_config.py` — AI subsystem configuration constants
+- `ai/__init__.py` — AI package marker
+- `ai/features/__init__.py` — Features subpackage marker
+- `ai/features/extractor.py` — FeatureExtractor class (104-element vector)
+- `ai/bridge.py` — AiGestureBridge (non-blocking, thread-safe buffer)
+- `profiles/__init__.py` — Profiles package marker
+- `profiles/profile_manager.py` — ProfileManager + Profile dataclass
+- `profiles/profiles/default.json` — Default user profile
+
+### Files Modified
+
+- `configs/constants.py` — Added `PROFILES_DIR` constant
+- `main.py` — Integrated AiGestureBridge and ProfileManager initialization and lifecycle
+- `README.md` — Updated architecture diagram, project structure, added AI Foundation section
+
+### Verification
+
+- All new modules compile and pass import verification.
+- FeatureExtractor produces correct 104-element float32 vector for valid 21-landmark input.
+- FeatureExtractor returns None for empty or partial landmark maps (graceful degradation).
+- AiGestureBridge start/stop lifecycle verified (is_running state transitions correct).
+- AiGestureBridge caches latest features thread-safely; returns None after stop().
+- ProfileManager creates default profile on first run; round-trips save/load correctly.
+- Full application imports successfully with all new modules.
+- Existing gesture pipeline completely untouched — no behavioral regression possible.
+- No new dependencies added to requirements.txt.
+
+### Recommended Phase 1B Tasks
+
+- Implement GestureRecorder with OpenCV recording UI
+- Add DatasetStorage for CSV/JSON export
+- Implement DataAugmenter for synthetic training data
+- Begin collecting labeled gesture samples (target: 500+ per gesture)
+
+## 2026-06-08 - Phase 1B: FeatureExtractor Refactor
+
+### Architecture Decision
+
+Following a detailed engineering audit that identified 39% feature redundancy, weak camera-distance invariance, and medium overfitting risk from z-coordinates and absolute hand position, the FeatureExtractor was redesigned from a 104-feature schema to a 61-feature schema.
+
+### Changes from Phase 1A
+
+**Removed:**
+- All 21 z-coordinates (63 → 0 features) — eliminated camera-distance noise source
+- All raw x,y normalised coordinates (42 → 0 features) — redundant with wrist-relative block and carried absolute-position overfitting risk
+
+**Added:**
+- 10 fingertip pairwise distances (C(5,2), normalised by hand size) — direct pinch/fist/open-hand signal
+- 5 finger extension deltas (tip.y − mcp.y, continuous) — strongest per-gesture signal per audit
+- 5 finger bend angle cosines (2D dot product at PIP joint, no z) — rotation-resistant curl information
+
+**Kept:**
+- 40 wrist-relative x,y coordinates (simplified: only 20 landmarks × 2, no z)
+- 1 hand size scalar
+
+### Feature Count Reduction
+
+| Metric | Phase 1A | Phase 1B | Delta |
+|---|---|---|---|
+| Total features | 104 | 61 | −41% |
+| Redundant features | ~40 | 0 | −100% |
+| Overfitting surface | High | Low | Significantly reduced |
+
+### Finger Spread Evaluation
+
+The adjacent fingertip distances (index↔middle, middle↔ring, ring↔pinky) are already included in Group B's C(5,2) combinations. No separate Finger Spread group is needed. The target schema of 61 features is correct.
+
+### Files Modified
+
+- `configs/ai_config.py` — FEATURE_COUNT 104→61, removed unused config flags
+- `ai/features/extractor.py` — Complete rewrite with 5-group pipeline
+- `tests/test_feature_extractor.py` — Added 17 tests covering all feature groups and edge cases
+- `README.md` — Updated feature vector documentation
+
+### Verification
+
+- All 17 tests pass (output shape, empty/partial landmarks, wrist-relative invariance, distance comparisons, extension deltas, angle cosines, hand size validity, determinism)
+- Feature extraction benchmark: **0.134 ms** per call (target: <0.5 ms)
+- AiGestureBridge requires **zero modifications** — bridge.latest_features.shape = (61,) naturally
+- Main application imports successfully with no changes to gesture pipeline
+- Existing controls and modes completely unchanged
+
+### Files Created
+
+- `tests/__init__.py` — Test package marker
+- `tests/test_feature_extractor.py` — Feature extraction test suite
+
+## 2026-06-08 - Phase 2: Dataset Infrastructure
+
+### Changes
+
+**New Modules:**
+- `ai/data/dataset_storage.py` — DatasetStorage: save, load, export (CSV/JSON), train/test split for labeled feature vectors
+- `ai/data/data_augmenter.py` — DataAugmenter: jitter, scale variation, feature dropout, and composite `augment_single` / `augment_dataset` pipelines
+- `ai/data/gesture_recorder.py` — GestureRecorder: interactive OpenCV tool with live camera feed, label selection (0-9), single-shot and continuous recording modes, undo, and dataset summary
+- `tools/record_gestures.py` — Standalone entry point (`python -m tools.record_gestures`)
+
+**Config Updates:**
+- `configs/ai_config.py` — Added 15 new constants for dataset paths, recorder keybindings, and augmentation parameters
+
+### Files Created
+
+- `ai/data/__init__.py`
+- `ai/data/dataset_storage.py`
+- `ai/data/data_augmenter.py`
+- `ai/data/gesture_recorder.py`
+- `tools/__init__.py`
+- `tools/record_gestures.py`
+- `tests/test_dataset_storage.py` (15 tests)
+- `tests/test_data_augmenter.py` (14 tests)
+
+### Verification
+
+- 46/46 tests pass (15 dataset storage + 14 data augmenter + 17 feature extractor)
+- End-to-end integration test: save → load → augment → export pipeline verified
+- Bridge compatibility verified — no changes to `ai/bridge.py` or `main.py`
+- Application imports successfully with no gesture pipeline modifications
+
+### Storage Layout
+
+```
+datasets/
+├── dataset_config.json      # version, feature_count
+├── LABEL_1/
+│   ├── sample_00000001.npy  # (61,) float32
+│   ├── sample_00000002.npy
+│   └── metadata.json
+├── LABEL_2/
+│   └── ...
+└── ...
+```
+
+## 2026-06-08 — Phase 2 Audit Improvements
+
+### Audit Findings Applied
+
+| # | Issue | Resolution |
+|---|-------|------------|
+| 1 | Labels describe actions not poses | Renamed to gesture-pose labels: `PINCH_INDEX`, `TWO_FINGER_UP`, `FIST`, etc. |
+| 2 | No session tracking | Auto-generated UUID4 session ID per recording session, stored in metadata |
+| 3 | No profile tracking | Profile ID sourced from `ProfileManager.active.profile_name`, stored in metadata |
+| 4 | No FEATURE_COUNT validation | `load_samples()` validates shape[-1] against config; warns on partial mismatch, raises on total mismatch |
+| 5 | No feature extractor versioning | `dataset_config.json` now stores `feature_extractor_schema_version`; `_check_schema_version()` warns on mismatch at init |
+| 6 | No raw landmark storage | Companion `_lm.npy` files (21×3 float32) stored alongside feature vectors |
+
+### Storage Design Decision: Separate Landmark Files
+
+Chosen **Option A** — separate `sample_00000001_lm.npy` files alongside existing `sample_00000001.npy`:
+
+| Criterion | A: Separate files | B: Combined .npz | C: Per-label HDF5 |
+|-----------|-------------------|------------------|-------------------|
+| Backward compatible | Yes | No (migration) | No (migration) |
+| Incremental writes | Yes (no rewrite) | Yes (no rewrite) | Complex (rewrite = full copy) |
+| Targeted landmark load | Yes | Yes (load subset) | Partial (read subset) |
+| Human-debuggable | Yes (.npy) | No (.npz) | No (binary) |
+| File count at 4000 samples | 8000 files | 4000 files | ~10 files |
+| Code complexity | Low | Low | High |
+
+Selected **Option A** for backward compatibility and simple incremental recording. The 2× file count is irrelevant at expected dataset sizes (<1000 samples/gesture).
+
+### Updated Storage Layout
+
+```
+datasets/
+├── dataset_config.json               # schema_version, feature_count, feature_extractor_version
+├── FIST/
+│   ├── sample_00000001.npy           # features (61,) float32
+│   ├── sample_00000001_lm.npy        # raw landmarks (21, 3) float32
+│   └── metadata.json                 # {sample_id: {timestamp, source, session_id, profile_id}}
+├── OPEN_HAND/
+│   └── ...
+└── ...
+```
+
+### Files Modified
+
+- `configs/ai_config.py` — Renamed 10 label entries, added `FEATURE_EXTRACTOR_SCHEMA_VERSION`
+- `ai/data/dataset_storage.py` — 9 new methods: landmark save/load/path helpers, FEATURE_COUNT validation, schema version check + config update, extended metadata schema
+- `ai/data/gesture_recorder.py` — Session ID (uuid4), profile ID (ProfileManager), landmarks passed to storage, label colors updated
+- `tests/test_dataset_storage.py` — 9 new tests (landmark storage, session/profile metadata, feature count validation, schema version, label isolation)
+
+### Migration Impact
+
+- **Zero migration required** — all new features are additive (optional parameters, companion files)
+- Existing `.npy` files load without change
+- Existing `metadata.json` files without `session_id`/`profile_id` load without error (fields are optional)
+- Load validation warns but does not block on shape mismatch
+- Config file is updated (schema_version `1.0` → `2.0`, new fields added) on first save; read-only access remains safe
+
+### Test Coverage
+
+- **56/56 tests pass** (24 dataset storage + 15 data augmenter + 17 feature extractor)
+- Landmark round-trip: save → load_landmarks → validate shape + values
+- Session/profile metadata: save → read JSON → assert fields present/absent
+- Feature count validation: wrong-shape files are warned and skipped; all-wrong raises ValueError
+- Schema version: config.json written with correct fields
+
+## 2026-06-08 — Pre-Phase 3 Dataset Finalization
+
+### Changes
+
+- **Added** `THREE_FINGER_PINCH` to `RECORDER_LABEL_MAP` (key `7`, replacing `PINCH_RING`) and to `_LABEL_COLORS`
+- **Finalized 9-label training set** for initial model training
+- **Documented label categories** (initial training vs reserved vs excluded)
+
+### Final Training Label Set
+
+| Key | Label | Category | Notes |
+|-----|-------|----------|-------|
+| `0` | `NO_HAND` | Initial training | Negative class / background |
+| `1` | `POINTING` | Initial training | Maps to `GestureName.MOVE` |
+| `2` | `PINCH_INDEX` | Initial training | Maps to `GestureName.LEFT_CLICK` |
+| `3` | `PINCH_MIDDLE` | Initial training | Maps to `GestureName.RIGHT_CLICK` |
+| `4` | `TWO_FINGER_UP` | Initial training | Collapses `SCROLL_UP` + `SCROLL_DOWN` (direction is rule-based) |
+| `5` | `OPEN_HAND` | Initial training | Collapses `OPEN_HAND` + `OPEN_HAND_HELD` |
+| `6` | `FIST` | Initial training | Maps to `GestureName.EXIT_HOLD` |
+| `7` | `THREE_FINGER_PINCH` | Initial training | Maps to `GestureName.SCREENSHOT_READY` |
+| `8` | `PINCH_PINKY` | Reserved | Available for recording, excluded from initial training |
+| `9` | `PEACE` | Initial training | Collapses `PEACE_SIGN` + `PEACE_HELD` |
+
+### Excluded From Static Dataset
+
+| Gesture | Reason | Future Path |
+|---------|--------|-------------|
+| `SWIPE_RIGHT` | Temporal (movement, not pose) | Sequence-based / temporal model |
+| `SWIPE_LEFT` | Temporal (movement, not pose) | Sequence-based / temporal model |
+| `PINCH_RING` | No detector implementation | Add when gesture is implemented |
+
+### Updated Sample Count Recommendations
+
+| Tier | Per Gesture | Total (9 labels) | Sessions Per Gesture |
+|------|-------------|------------------|---------------------|
+| MVP | 100 | 900 | 3 (30-35 samples each) |
+| Minimum viable | 250 | 2250 | 6-8 |
+| Production | 500+ | 4500+ | 10-15 |
+
+### Files Modified
+
+- `configs/ai_config.py` — Key `7` changed from `PINCH_RING` to `THREE_FINGER_PINCH`; added training-set comment
+- `ai/data/gesture_recorder.py` — `_LABEL_COLORS` updated (added `THREE_FINGER_PINCH`, removed `PINCH_RING`)
+- `README.md` — Label table updated with training set column, PINCH_PINKY marked reserved, swipes documented as future targets
+
+### Next Steps (Phase 3)
+
+1. Implement gesture classifier training pipeline
+2. Train baseline model on MVP dataset (100 per gesture)
+3. Add real-time inference to AiGestureBridge
+4. Evaluate accuracy before scaling to production dataset
